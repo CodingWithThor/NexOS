@@ -1,74 +1,100 @@
-; ==================================
-; NASM - Stage 2: Przejście do Protected Mode (32-bit)
-; ==================================
-
 BITS 16
-ORG 0x8000 ; Stage 2 jest ładowany pod adres 0x8000
+ORG 0x8000
+
+PML4_ADDR  equ 0x9000
+PDPT_ADDR  equ 0xA000
+PD_ADDR    equ 0xB000
 
 START_STAGE2:
-    cli                    ; Wyłącz przerwania
-    
-    ; 1. Załadowanie GDT
+    cli
+
     lgdt [GDT_PTR]
-    
-    ; 2. Włączenie Protection Enable (bit PE w CR0)
+
     mov eax, cr0
-    or eax, 0x1           ; Ustaw bit 0 (PE)
+    or eax, 0x1
     mov cr0, eax
 
-    ; 3. Daleki skok (Far Jump) do kodu 32-bitowego
-    ; Używamy deskryptora Code Segment 32-bitowego (Offset 0x08)
     jmp 0x08:PROTECTED_MODE_ENTRY
 
-; ==================================
-; GDT - Global Descriptor Table (dla Protected Mode)
-; ==================================
 GDT_START:
-    ; 0. Null Descriptor (Offset 0x00)
-    dd 0x0                  
-    dd 0x0
-    
-CODE_DESC:
-    ; 1. 32-bit Code Segment Descriptor (Offset 0x08)
-    dw 0xFFFF               ; Limit (0-15)
-    dw 0x0                  ; Base (0-15)
-    db 0x0                  ; Base (16-23)
-    db 10011010b            ; Access Byte: Present=1, Privl=0, Executable=1, R/W=1
-    db 11001111b            ; Flags: Granularity=1, Size=1 (32-bit), Limit(16-19)
-    db 0x0                  ; Base (24-31)
+    dd 0x0, 0x0
+
+CODE_DESC_32:
+    dw 0xFFFF
+    dw 0x0
+    db 0x0
+    db 10011010b
+    db 11001111b
+    db 0x0
 
 DATA_DESC:
-    ; 2. 32-bit Data Segment Descriptor (Offset 0x10)
-    dw 0xFFFF               ; Limit (0-15)
-    dw 0x0                  ; Base (0-15)
-    db 0x0                  ; Base (16-23)
-    db 10010010b            ; Access Byte: Present=1, Privl=0, R/W=1
-    db 11001111b            ; Flags: Granularity=1, Size=1 (32-bit), Limit(16-19)
-    db 0x0                  ; Base (24-31)
+    dw 0xFFFF
+    dw 0x0
+    db 0x0
+    db 10010010b
+    db 11001111b
+    db 0x0
+
+CODE_DESC_64:
+    dd 0x0
+    db 0x9A
+    db 0xA0
+    dd 0x0
+
 GDT_END:
 
 GDT_PTR:
-    dw GDT_END - GDT_START - 1 ; Limit GDT (rozmiar - 1)
-    dd GDT_START               ; Adres GDT
+    dw GDT_END - GDT_START - 1
+    dd GDT_START
 
-; ==================================
-; Kod w trybie chronionym (32-bit)
-; ==================================
 BITS 32
 PROTECTED_MODE_ENTRY:
-    ; Ustawienie rejestrów segmentowych na deskryptor Danych (Offset 0x10)
     mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
     mov ss, ax
+    mov esp, 0x90000
 
-    ; Ustaw stos 32-bitowy
-    mov esp, 0x90000 ; Ustawiamy stos na bezpieczny adres (np. 576 KB)
+    mov edi, PML4_ADDR
+    mov ecx, 1024 / 4
+    xor eax, eax
+    cld
+    rep stosd
 
-    ; W tej pętli jesteśmy już w 32-bit Protected Mode!
+    mov dword [PML4_ADDR], PDPT_ADDR | 0b11
+
+    mov dword [PDPT_ADDR], PD_ADDR | 0b11
+
+    mov edi, PD_ADDR
+    mov dword [edi], 0x0 | 0b10000011
+
+    mov eax, PML4_ADDR
+    mov cr3, eax
+
+    mov eax, cr4
+    or eax, 0x20
+    mov cr4, eax
+
+    mov ecx, 0xC0000080
+    rdmsr
+    or eax, 0x100
+    wrmsr
+
+    mov eax, cr0
+    or eax, 0x80000001
+    mov cr0, eax
+
+    jmp 0x18:LONG_MODE_ENTRY
+
+BITS 64
+LONG_MODE_ENTRY:
+    mov ax, 0x10
+    mov ss, ax
+    mov rsp, 0x90000
+
+    hlt
     jmp $
-    
-; Wypełnienie pliku Stage 2 (5120 bajtów)
+
 times 5120 - ($ - $$) db 0
