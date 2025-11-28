@@ -1,24 +1,25 @@
-# 🚀 NexOS
-### Eksperymentalne 64-bitowe Jądro (OSDev)
+# NexOS
+### Experimental 64-bit Kernel (OSDev)
 
-NexOS Kernel to ambitny projekt jądra systemu operacyjnego (OSDev), tworzony od podstaw z wykorzystaniem **Assembly (NASM)** i **C**. Celem projektu jest głęboka eksploracja niskopoziomowych mechanizmów systemowych i stworzenie funkcjonalnego jądra 64-bitowego.
+NexOS Kernel is an ambitious operating-system-kernel project (OSDev), built from scratch using **Assembly (NASM)** and **C**. The goal of the project is to deeply explore low-level system mechanisms and create a functional 64-bit kernel.
 
 ---
 
-## Kluczowe Cele i Aspiracje
+## Key Goals and Aspirations
 
-| Cel | Opis |
+| Goal | Description |
 | :--- | :--- |
-| **Architektura** | Pełne wsparcie dla **x86-64 (Long Mode)**. |
-| **Kompatybilność** | Analiza i implementacja wsparcia dla formatu plików wykonywalnych **.EXE** (Portable Executable) na poziomie jądra. |
-| **Bezpieczeństwo (Anticheat)** | Opracowanie wbudowanego, jądrowego mechanizmu zabezpieczającego, monitorującego procesy na poziomie **Ring 0** (inspiracja architekturą systemów antycheat, takich jak Riot Vanguard). |
+| **Architecture** | Full support for **x86-64 (Long Mode)**. |
+| **Compatibility** | Research and implementation of **.EXE (Portable Executable)** executable format support directly at the kernel level. |
+| **Security (Anticheat)** | Development of an integrated kernel-level security mechanism that monitors processes in **Ring 0** (inspired by architectures of anticheat systems like Riot Vanguard). |
 
 ---
 
-## Aktualny Status
+## Current Status
 
-Jądro jest obecnie w fazie wczesnego **bootstrappingu**.
+The kernel is currently in an early **bootstrapping** phase.
 
-* **Stan:** Działający 16-bitowy sektor rozruchowy (boot sector).
-* **Technologie:** NASM (16-bit), QEMU.
-* **Następny Krok:** Implementacja Stage 2 bootloadera i przełączanie do 64-bitowego Long Mode.
+- **Status:** Fully functioning 16-bit boot sector  
+- **Technologies:** NASM (16-bit), QEMU  
+- **Next Step:** Implementing the Stage 2 bootloader and switching to 64-bit Long Mode
+```
