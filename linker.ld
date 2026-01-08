@@ -1,4 +1,3 @@
-/* Plik: linker.ld */
 ENTRY(loader)
 
 SECTIONS

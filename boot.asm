@@ -1,4 +1,3 @@
-; Plik: boot.asm
 bits 32                         ; Startujemy w trybie 32-bitowym (standard Multiboot)
 
 section .multiboot
