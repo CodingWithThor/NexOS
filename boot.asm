@@ -1,79 +1,78 @@
-; ==================================
-; NASM - Stage 1: Ładowanie Stage 2 i Jądra C
-; ==================================
+; Plik: boot.asm
+bits 32                         ; Startujemy w trybie 32-bitowym (standard Multiboot)
 
-BITS 16               
-ORG 0x7C00            
+section .multiboot
+align 4
+    dd 0x1BADB002               ; Magic number dla Multiboot
+    dd 0x00                     ; Flagi
+    dd -(0x1BADB002 + 0x00)     ; Checksum (Magic + Flags + Checksum musi dać 0)
 
-; --- Stałe Ładowania ---
-STAGE2_LOAD_ADDR equ 0x8000  ; Adres, gdzie załadujemy Stage 2
-STAGE2_SECTORS   equ 20      ; CAŁKOWITA liczba sektorów (Stage 2 + Kernel C)
-BOOT_DRIVE       equ 0x00    
-STAGE2_START_SECTOR equ 0x02 ; Stage 2 zaczyna się od Sektora 2
+section .text
+global loader
+extern kernel_main
 
-START:
-    cli                   
-    
-    ; Ustawienie segmentów
-    mov ax, 0x07C0        
+loader:
+    mov esp, stack_top          ; Ustawienie stosu dla jądra
+
+    ; --- Przygotowanie Pagingu (Identity Mapping 0-2MB) ---
+    ; W 64-bitach stronicowanie jest obowiązkowe.
+    mov eax, pdpt_table
+    or eax, 0b11                ; Flagi: Present + Writable
+    mov [pml4_table], eax
+
+    mov eax, pd_table
+    or eax, 0b11
+    mov [pdpt_table], eax
+
+    mov eax, 0x000000           ; Mapujemy adres fizyczny 0x0
+    or eax, 0b10000011          ; Present + Writable + Huge Page (2MB)
+    mov [pd_table], eax
+
+    ; --- Włączenie Long Mode (64-bit) ---
+    mov eax, pml4_table
+    mov cr3, eax                ; Załaduj adres PML4 do rejestru sterującego CR3
+
+    mov eax, cr4
+    or eax, 1 << 5              ; Włącz PAE (Physical Address Extension)
+    mov cr4, eax
+
+    mov ecx, 0xC0000080         ; Numer rejestru EFER
+    rdmsr
+    or eax, 1 << 8              ; Ustaw bit LME (Long Mode Enable)
+    wrmsr
+
+    mov eax, cr0
+    or eax, 1 << 31             ; Włącz Paging (PG bit)
+    mov cr0, eax
+
+    lgdt [gdt64.pointer]        ; Załaduj nową, 64-bitową tablicę GDT
+    jmp gdt64.code:long_mode    ; Skok daleki, aby odświeżyć rejestr CS
+
+bits 64
+long_mode:
+    mov ax, 0x0                 ; Wyzerowanie rejestrów segmentowych
+    mov ss, ax
     mov ds, ax
     mov es, ax
-    mov ss, ax
-    mov sp, 0xFFFE        
-    
-    sti                   
 
-    ; --- Wyświetlenie komunikatu ---
-    mov si, MESSAGE_TEXT
-    call print_string
+    call kernel_main            ; Wywołanie Twojego kodu w C
+    hlt                         ; Zatrzymaj procesor, jeśli jądro powróci
 
-    ; --- Ładowanie Stage 2 + Jądro C z dysku (Standardowy CHS) ---
-    
-load_stage2:
-    mov ah, 0x02              ; Funkcja: Odczytaj sektory
-    mov al, STAGE2_SECTORS    ; AL = Liczba sektorów do odczytu (20)
-    
-    mov ch, 0x00              ; CH = Cylinder 0
-    mov cl, STAGE2_START_SECTOR ; CL = Sektor startowy (Sektor 2)
-    mov dh, 0x00              ; DH = Głowica 0
-    mov dl, BOOT_DRIVE        ; DL = Numer napędu
-    
-    mov bx, STAGE2_LOAD_ADDR  ; BX = Offset docelowy (0x8000)
-    mov es, bx                ; ES:BX = Adres docelowy
-    
-    int 0x13                  ; Wywołanie przerwania odczytu dysku
-    jc disk_error             
-    
-    ; Upewnienie się co do adresu skoku
-    mov ax, 0x0000
-    mov es, ax
-    mov bx, STAGE2_LOAD_ADDR  ; BX = 0x8000
-    
-    ; Przekazanie kontroli do wczytanego kodu Stage 2
-    jmp 0x0000:STAGE2_LOAD_ADDR 
-    
-; ==================================
-; Funkcja drukowania i obsługa błędów
-; ==================================
-print_string:
-    lodsb                 
-    or al, al             
-    jz print_done         
-    mov ah, 0x0E          
-    mov bh, 0x00          
-    int 0x10              
-    jmp print_string      
-print_done:
-    ret
+section .bss
+align 4096
+pml4_table: resb 4096
+pdpt_table: resb 4096
+pd_table:   resb 4096
+stack_bottom: resb 4096 * 4     ; 16KB miejsca na stos
+stack_top:
 
-disk_error:
-    mov si, ERROR_TEXT
-    call print_string
-    hlt                   
-    jmp $                 
-
-MESSAGE_TEXT db "NexOS Kernel Booting...", 0x0A, 0x0D, 0x00
-ERROR_TEXT   db "Disk Read Error! Halting.", 0x0A, 0x0D, 0x00
-
-times 510 - ($ - $$) db 0
-dw 0xAA55
+section .rodata
+gdt64:
+    .null: dq 0
+    .code: equ $ - gdt64
+        dq (1<<43) | (1<<44) | (1<<47) | (1<<53) ; Deskryptor kodu
+    .data: equ $ - gdt64
+        dq (1<<44) | (1<<47) | (1<<41)           ; Deskryptor danych
+    .pointer:
+        dw $ - gdt64 - 1
+        dq gdt64

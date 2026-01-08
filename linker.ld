@@ -1,16 +1,18 @@
-/* linker.ld */
-ENTRY(kmain)
-PHDRS { code PT_LOAD; }
-SECTIONS {
-    . = 0x9400; /* Ustawienie adresu startowego kodu C */
-    .text : {
+/* Plik: linker.ld */
+ENTRY(loader)
+
+SECTIONS
+{
+    /* Standard dla Multiboot: zaczynamy od 1MB pamięci fizycznej */
+    . = 1M;
+
+    .text :
+    {
+        *(.multiboot) /* Nagłówek musi być pierwszy! */
         *(.text)
-        *(.rodata)
-    } : code
-    .data : {
-        *(.data)
     }
-    .bss : {
-        *(.bss)
-    }
+
+    .rodata : { *(.rodata) }
+    .data   : { *(.data) }
+    .bss    : { *(.bss) }
 }

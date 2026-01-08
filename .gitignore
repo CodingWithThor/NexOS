@@ -1,0 +1,15 @@
+# Pliki obiektowe (wygenerowane przez nasm i gcc)
+*.o
+
+# Pliki binarne jądra
+*.bin
+
+# Obrazy płyt i dysków
+*.iso
+*.img
+
+# Foldery tymczasowe (np. folder iso tworzony przez Makefile)
+iso/
+
+# Logi QEMU (jeśli ich używasz)
+*.log
